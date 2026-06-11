@@ -127,6 +127,26 @@
   .pano{padding:14px;font-size:13px;line-height:1.6;color:var(--txt)}
   .pano.placeholder{color:var(--txt-dim)}
   .pano h4{color:var(--ai);font-size:13px;margin-bottom:6px}
+  .pano p{margin-bottom:6px}
+
+  /* DASH: SESSIONS + RISK */
+  .dash{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.dash{grid-template-columns:1fr}}
+  .sess{display:flex;gap:9px;flex-wrap:wrap}
+  .schip{flex:1;min-width:110px;border:1px solid var(--border);border-radius:11px;padding:10px;text-align:center;background:#0a1322;transition:.15s}
+  .schip .sn{font-size:13px;font-weight:700}
+  .schip .ss{font-size:10.5px;color:var(--txt-dim);margin-top:2px}
+  .schip.open{border-color:var(--up);background:rgba(22,199,132,.1)}
+  .schip.open .ss{color:var(--up)}
+  .sessmsg{margin-top:12px;font-size:12.5px;padding:9px 11px;border-radius:9px;background:#0a1322;border:1px solid var(--border)}
+  .sessmsg.hot{border-color:var(--hot);background:rgba(255,84,112,.1);color:#ffc2cd}
+  .sessmsg b{color:var(--accent)}
+  .gauge{position:relative;height:16px;border-radius:9px;background:linear-gradient(90deg,var(--down),#5a6b4a 50%,var(--up));border:1px solid var(--border);margin:18px 0 8px}
+  .gauge .needle{position:absolute;top:-6px;width:4px;height:28px;background:#fff;border-radius:3px;box-shadow:0 0 8px rgba(0,0,0,.6);transition:left .4s}
+  .gaugelbl{display:flex;justify-content:space-between;font-size:11px;font-weight:700}
+  .gaugelbl .o{color:var(--down)} .gaugelbl .n{color:var(--up)}
+  .riskverdict{text-align:center;font-size:15px;font-weight:800;margin-top:12px}
+  .risksub{text-align:center;font-size:11.5px;color:var(--txt-dim);margin-top:3px}
 
   /* TV */
   .tvbox{position:relative;background:#000;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
@@ -203,12 +223,26 @@
   <div class="section-title"><b>🔮 Pronóstico ahora</b> · sesgo por noticias (próximas horas / swing)<span class="ln"></span><span id="fcStamp" style="color:var(--txt-dim);font-size:11px"></span></div>
   <div class="fcgrid mb" id="forecast"></div>
 
+  <!-- SESSIONS + RISK -->
+  <div class="section-title"><b>⏱️ Sesiones de mercado</b> &amp; clima de riesgo<span class="ln"></span></div>
+  <div class="dash mb">
+    <div class="panel">
+      <div class="ph"><span><span class="ic">🕒</span> Sesiones activas (volatilidad)</span><span id="sessNext" style="font-size:10.5px;color:var(--txt-dim)"></span></div>
+      <div id="sessions" style="padding:14px"></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><span><span class="ic">🌡️</span> Termómetro Risk-On / Risk-Off</span><span id="riskStamp" style="font-size:10.5px;color:var(--txt-dim)"></span></div>
+      <div id="riskmeter" style="padding:20px 16px"></div>
+    </div>
+  </div>
+
   <!-- MAIN COLS -->
   <div class="cols mb">
     <div>
       <div class="section-title"><b>🧠 Análisis de noticias</b> en tiempo real<span class="ln"></span></div>
       <div class="feedhead">
         <div class="search">🔎 <input id="search" placeholder="Filtrar: Fed, oro, Irán, IPC, Nasdaq…"></div>
+        <div class="toggle" id="onlyMine" style="font-size:12px" title="Mostrar solo noticias que afectan a mi activo"><span class="switch"></span> Solo mi activo</div>
         <span id="feedSub" style="font-size:11px;color:var(--txt-dim);margin-left:auto">Cargando…</span>
       </div>
       <div class="afeed" id="afeed">
@@ -217,8 +251,13 @@
     </div>
     <div class="side-col">
       <div class="panel">
-        <div class="ph"><span><span class="ic">🧠</span> Panorama IA · próximas horas</span><button class="btn ai" id="panoBtn" style="padding:5px 10px;font-size:12px">Generar</button></div>
-        <div class="pano placeholder" id="pano">Configura tu IA (botón “Configurar IA”) y pulsa <b>Generar</b> para un panorama redactado de las próximas horas. Mientras tanto, el pronóstico de arriba ya funciona con el motor de análisis automático.</div>
+        <div class="ph"><span><span class="ic">📋</span> Panorama del día</span>
+          <span style="display:flex;gap:6px">
+            <button class="btn" id="panoBtn" style="padding:5px 10px;font-size:12px" title="Regenerar panorama (sin IA, gratis)">↻</button>
+            <button class="btn ai" id="panoAiBtn" style="padding:5px 10px;font-size:12px" title="Redacción avanzada con tu IA">✨ IA</button>
+          </span>
+        </div>
+        <div class="pano" id="pano">Generando panorama…</div>
       </div>
       <div class="panel">
         <div class="ph"><span><span class="ic">⏰</span> Agenda · próximas horas</span><span id="agStamp" style="font-size:10.5px;color:var(--txt-dim)"></span></div>
@@ -256,7 +295,7 @@
   <div class="box">
     <div class="mh"><span>🧠 Configurar Analizador IA</span><span class="x" id="aiClose">✕</span></div>
     <div class="mb2">
-      <div class="note">🔐 Tu clave se guarda <b>solo en este navegador</b> (localStorage), nunca se sube al repositorio. Como compartiste tu clave en el chat, te recomiendo <b>regenerarla</b> en kluster.ai y pegar la nueva aquí.</div>
+      <div class="note">🔐 Tu clave se guarda <b>solo en este navegador</b> (localStorage), nunca se sube al repositorio. Como compartiste tu clave en el chat, <b>regenérala</b> en la web de tu proveedor (p. ej. console.groq.com) y pega aquí la nueva. <b>Groq</b> y <b>Gemini</b> son los que mejor funcionan desde el navegador.</div>
       <div class="field"><label>Proveedor</label>
         <select id="aiProvider">
           <option value="kluster">Kluster.ai</option>
@@ -349,8 +388,9 @@ const FEEDS=[
 const CAT_BADGE={macro:{t:'Macro',c:'var(--accent-2)'},markets:{t:'Mercados',c:'var(--accent)'},micro:{t:'Sector',c:'var(--ai)'},politica:{t:'Política',c:'var(--warn)'},social:{t:'Social',c:'var(--hot)'}};
 
 const REFRESH_MS=4*60*1000;
-let STATE={items:[],cat:'markets',q:'',translate:true};
+let STATE={items:[],cat:'markets',q:'',translate:true,onlyMine:false,forecast:null,agenda:[]};
 const trCache=new Map();
+let seenAlert=new Set();let firstLoad=true;
 
 /* ===========================================================
    IA CONFIG
@@ -393,9 +433,9 @@ async function translateItem(it){if(it.lang!=='en'||it._tr)return;const[t,d]=awa
    =========================================================== */
 function lc(it){return(it.title+' '+it.desc).toLowerCase();}
 function analyze(it){
- const s=lc(it);const sc={US30:0,US100:0,XAUUSD:0,EURUSD:0};const themes=[];
- for(const th of THEMES){ if(th.kw.some(k=>s.includes(k))){ themes.push(th.label); for(const k in th.eff) sc[k]+=th.eff[k]; } }
- it._sc=sc;it._themes=themes;it._anti=ANTI_KW.some(k=>s.includes(k));
+ const s=lc(it);const sc={US30:0,US100:0,XAUUSD:0,EURUSD:0};const themes=[];const ids=[];
+ for(const th of THEMES){ if(th.kw.some(k=>s.includes(k))){ themes.push(th.label); ids.push(th.id); for(const k in th.eff) sc[k]+=th.eff[k]; } }
+ it._sc=sc;it._themes=themes;it._ids=ids;it._anti=ANTI_KW.some(k=>s.includes(k));
  it._maxAbs=Math.max(...ORDER.map(k=>Math.abs(sc[k])));
  return it;
 }
@@ -412,12 +452,26 @@ async function loadAll(){
  const seen=new Set();items=items.filter(i=>{if(seen.has(i.id))return false;seen.add(i.id);return true;});
  items.sort((a,b)=>b.ts-a.ts);items=items.slice(0,170);
  items.forEach(analyze);
- STATE.items=items;renderAll();
+ STATE.items=items;renderAll();checkAlerts(items);
  if(STATE.translate){const en=items.filter(i=>i.lang==='en'&&!i._tr).slice(0,45);for(const it of en){await translateItem(it);analyze(it);}renderAll();}
  setSub(items.length+' titulares · '+new Date().toLocaleTimeString('es-ES'));
  document.getElementById('fcStamp').textContent='Actualizado '+new Date().toLocaleTimeString('es-ES');
 }
-function renderAll(){buildForecast();renderFeed();renderGrid();}
+function renderAll(){buildForecast();renderFeed();renderGrid();renderRiskMeter();generatePanoramaLocal();}
+function checkAlerts(items){
+ const strong=items.filter(i=>i._maxAbs>=3);
+ const fresh=strong.filter(i=>!seenAlert.has(i.id));
+ strong.forEach(i=>seenAlert.add(i.id));
+ if(firstLoad){firstLoad=false;return;}
+ fresh.slice(0,3).forEach((it,n)=>{
+  let top=ORDER.reduce((a,b)=>Math.abs(it._sc[b])>Math.abs(it._sc[a])?b:a);
+  const d=dirOf(it._sc[top]);
+  setTimeout(()=>{
+   toast(`🚨 ${INSTRUMENTS[top].label} ${d.ar} ${d.t} · ${it.title.slice(0,46)}…`);
+   if('Notification'in window&&Notification.permission==='granted'){new Notification('🚨 Noticia de alto impacto · '+INSTRUMENTS[top].label+' '+d.ar+' '+d.t,{body:it.title.slice(0,120)});}
+  },n*2600);
+ });
+}
 
 /* ===========================================================
    PRONÓSTICO AGREGADO (4 activos)
@@ -425,13 +479,16 @@ function renderAll(){buildForecast();renderFeed();renderGrid();}
 function buildForecast(){
  const cont=document.getElementById('forecast');
  const now=Date.now();
- const agg={};ORDER.forEach(k=>agg[k]={score:0,drivers:[]});
+ const agg={};ORDER.forEach(k=>agg[k]={score:0,drivers:[],themeScore:{}});
  // ponderar por recencia (últimas 18h pesan más)
  STATE.items.forEach(it=>{
   if(it._maxAbs<1)return;
   const ageH=(now-it.ts)/3.6e6; const w=ageH<6?1:ageH<18?0.6:ageH<36?0.3:0.12;
-  ORDER.forEach(k=>{const v=it._sc[k];if(v){agg[k].score+=v*w; if(Math.abs(v)>=2)agg[k].drivers.push({v,it});}});
+  ORDER.forEach(k=>{const v=it._sc[k];if(v){agg[k].score+=v*w; if(Math.abs(v)>=2)agg[k].drivers.push({v,it});
+    (it._themes||[]).forEach((t,i)=>{ if(it._ids&&it._ids[i]){const e=(THEMES.find(x=>x.id===it._ids[i])||{eff:{}}).eff[k]||0; if(e) agg[k].themeScore[t]=(agg[k].themeScore[t]||0)+Math.abs(e)*w;} });
+  }});
  });
+ STATE.forecast={};
  cont.innerHTML='';
  ORDER.forEach(k=>{
   const ins=INSTRUMENTS[k];const raw=agg[k].score; const norm=Math.max(-10,Math.min(10,raw));
@@ -440,6 +497,8 @@ function buildForecast(){
   const pct=Math.round((norm+10)/20*100);
   const fillC=norm>0?'var(--up)':norm<0?'var(--down)':'var(--neutral)';
   const fillStyle=norm>=0?`left:50%;width:${(pct-50)}%;background:${fillC}`:`right:50%;width:${(50-pct)}%;background:${fillC}`;
+  const topTheme=Object.entries(agg[k].themeScore).sort((a,b)=>b[1]-a[1])[0];
+  STATE.forecast[k]={dirVal:norm,conf,topTheme:topTheme?topTheme[0]:null};
   // drivers top
   const drv=agg[k].drivers.sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).slice(0,2)
     .map(x=>`<div class="drv">${x.v>0?'<span style="color:var(--up)">▲</span>':'<span style="color:var(--down)">▼</span>'} <b>${esc(x.it.title.slice(0,68))}${x.it.title.length>68?'…':''}</b></div>`).join('')||'<div class="drv">Sin catalizadores fuertes ahora mismo.</div>';
@@ -481,6 +540,7 @@ function renderFeed(){
  let list=STATE.items.filter(i=>i.cat==='macro'||i._maxAbs>=1);
  if(STATE.q){const q=STATE.q.toLowerCase();list=list.filter(i=>(i.title+' '+i.desc+' '+i.src).toLowerCase().includes(q));}
  list.forEach(i=>{i._rel=isRelevant(i);});
+ if(STATE.onlyMine){list=list.filter(i=>i._sc[SELECTED]!==0||INSTRUMENTS[SELECTED].kw.some(k=>lc(i).includes(k)));}
  // priorizar: con impacto fuerte y relevantes al activo y recientes
  list.sort((a,b)=>(b._rel-a._rel)||(b._maxAbs-a._maxAbs)||(b.ts-a.ts));
  list=list.slice(0,45);
@@ -542,6 +602,7 @@ async function loadAgenda(){
    .filter(e=>['USD','EUR'].includes(e.ccy)&&['High','Medium'].includes(e.impact)&&e.when>now-3600e3)
    .sort((a,b)=>a.when-b.when).slice(0,12);
  if(!ev.length){cont.innerHTML='<div class="empty">Sin eventos de alto impacto próximos.</div>';return;}
+ STATE.agenda=ev;
  cont.innerHTML=ev.map(e=>{
   const dt=new Date(e.when);const hh=dt.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
   const dd=dt.toLocaleDateString('es-ES',{day:'2-digit',month:'short'});
@@ -595,6 +656,64 @@ async function generarPanorama(){
 }
 
 /* ===========================================================
+   PANORAMA LOCAL (sin IA, gratis)
+   =========================================================== */
+function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
+function nextHighImpact(){const now=Date.now();const list=(STATE.agenda||[]).filter(e=>e.when>now);const hi=list.find(e=>e.impact==='High')||list[0];if(!hi)return null;const diff=hi.when-now;const h=Math.floor(diff/3600e3),m=Math.floor((diff%3600e3)/60000);hi._cd=h>0?`en ${h}h ${m}m`:`en ${m}m`;return hi;}
+function topThemeGlobal(){const c={};STATE.items.forEach(it=>(it._themes||[]).forEach(t=>c[t]=(c[t]||0)+1));const e=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];return e?e[0]:null;}
+function riskScore(){const ON=['riskon','growth','dovish','tech_pos','usd_down'];const OFF=['riskoff','recession','hawkish','tech_neg','oil_up','usd_up'];let on=0,off=0;const now=Date.now();STATE.items.forEach(it=>{const ageH=(now-it.ts)/3.6e6;const w=ageH<12?1:ageH<24?0.5:0.2;(it._ids||[]).forEach(id=>{if(ON.includes(id))on+=w;if(OFF.includes(id))off+=w;});});const tot=on+off;const net=tot?((on-off)/tot):0;return{on,off,net};}
+function generatePanoramaLocal(){
+ const pano=document.getElementById('pano');if(!STATE.forecast)return;
+ const r=riskScore();const moodLabel=r.net>0.15?'RISK-ON (apetito por riesgo)':r.net<-0.15?'RISK-OFF (aversión al riesgo)':'MIXTO / sin dirección clara';
+ const moodColor=r.net>0.15?'var(--up)':r.net<-0.15?'var(--down)':'var(--neutral)';
+ const moodIcon=r.net>0.15?'🟢':r.net<-0.15?'🔴':'🟡';
+ let html=`<h4>📋 Panorama · ${new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long'})} · ${new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</h4>`;
+ html+=`<p><b>Clima de mercado:</b> ${moodIcon} <b style="color:${moodColor}">${moodLabel}</b>.</p>`;
+ ORDER.forEach(k=>{const f=STATE.forecast[k];const d=dirOf(f.dirVal);const motivo=f.topTheme?`por ${f.topTheme.toLowerCase()}`:'sin catalizador dominante en las noticias';
+   html+=`<p><b style="color:${d.c}">${d.ar} ${INSTRUMENTS[k].label}</b> · sesgo <b>${d.t.toLowerCase()}</b> (${f.conf}%) — ${esc(motivo)}.</p>`;});
+ const ne=nextHighImpact();
+ if(ne)html+=`<p style="margin-top:6px"><b>⏰ Próximo evento clave:</b> ${esc(ne.title)} (${ne.ccy}) ${ne._cd}. Posible volatilidad en ${(CCY_INSTR[ne.ccy]||[]).join(', ')}.</p>`;
+ const rp=topThemeGlobal();
+ if(rp)html+=`<p style="margin-top:4px;color:var(--warn)"><b>⚠️ Foco del día:</b> ${esc(rp)}.</p>`;
+ html+=`<p style="margin-top:8px;font-size:11px;color:var(--txt-dim)">Generado por el motor automático (sin IA). Pulsa “✨ IA” para una redacción avanzada.</p>`;
+ pano.className='pano';pano.innerHTML=html;
+}
+
+/* ===========================================================
+   SESIONES DE MERCADO
+   =========================================================== */
+function renderSessions(){
+ const el=document.getElementById('sessions');if(!el)return;
+ const now=new Date();const u=now.getUTCHours()+now.getUTCMinutes()/60;
+ const S=[{n:'Sídney',o:22,c:7},{n:'Tokio',o:0,c:9},{n:'Londres',o:8,c:17},{n:'Nueva York',o:13,c:22}];
+ const isOpen=s=>s.o<s.c?(u>=s.o&&u<s.c):(u>=s.o||u<s.c);
+ el.querySelector&&(el.innerHTML='');
+ const chips=S.map(s=>`<div class="schip ${isOpen(s)?'open':''}"><div class="sn">${s.n}</div><div class="ss">${isOpen(s)?'● Abierta':'Cerrada'}</div></div>`).join('');
+ const overlap=(u>=13&&u<17);
+ let msg;
+ if(overlap){msg=`<div class="sessmsg hot">🔥 <b>Solapamiento Londres–Nueva York</b>: la ventana de <b>mayor volatilidad</b> del día. Ideal para US30, US100, XAUUSD y EUR/USD.</div>`;}
+ else{let t=13-u;if(t<0)t+=24;const h=Math.floor(t),m=Math.round((t-h)*60);msg=`<div class="sessmsg">⏳ Apertura de <b>Nueva York</b> en <b>${h}h ${m}m</b>. El solapamiento Londres–NY (13:00–17:00 UTC) concentra la mayor volatilidad.</div>`;}
+ el.innerHTML=`<div class="sess">${chips}</div>${msg}`;
+ const sn=document.getElementById('sessNext');if(sn)sn.textContent=overlap?'🔥 Volatilidad máxima':'';
+}
+
+/* ===========================================================
+   TERMÓMETRO RISK-ON / RISK-OFF
+   =========================================================== */
+function renderRiskMeter(){
+ const el=document.getElementById('riskmeter');if(!el)return;
+ const r=riskScore();const pct=Math.round((r.net+1)/2*100);
+ const label=r.net>0.15?'RISK-ON':r.net<-0.15?'RISK-OFF':'NEUTRAL';
+ const color=r.net>0.15?'var(--up)':r.net<-0.15?'var(--down)':'var(--neutral)';
+ const sub=r.net>0.15?'Favorable a índices (US30/US100). Oro pierde brillo de refugio.':r.net<-0.15?'Aversión: presión en índices, el oro (XAUUSD) gana como refugio.':'Sin sesgo de riesgo claro: opera con cautela.';
+ el.innerHTML=`<div class="gaugelbl"><span class="o">◀ Risk-Off</span><span class="n">Risk-On ▶</span></div>
+  <div class="gauge"><div class="needle" style="left:calc(${pct}% - 2px)"></div></div>
+  <div class="riskverdict" style="color:${color}">${label}</div>
+  <div class="risksub">${sub}</div>`;
+ const rs=document.getElementById('riskStamp');if(rs)rs.textContent=Math.round(r.on)+'↑ / '+Math.round(r.off)+'↓ señales';
+}
+
+/* ===========================================================
    TRADINGVIEW HELPER
    =========================================================== */
 function tvInto(el,src,cfg){el.innerHTML='';const w=document.createElement('div');w.className='tradingview-widget-container';const i=document.createElement('div');i.className='tradingview-widget-container__widget';w.appendChild(i);const s=document.createElement('script');s.async=true;s.src=src;s.innerHTML=JSON.stringify(cfg);w.appendChild(s);el.appendChild(w);}
@@ -617,7 +736,9 @@ document.getElementById('aiProvider').onchange=e=>{const p=AI_PRESETS[e.target.v
 document.getElementById('aiUse').onclick=function(){this.classList.toggle('on');};
 document.getElementById('aiSave').onclick=()=>{const cfg={provider:document.getElementById('aiProvider').value,base:document.getElementById('aiBase').value.trim(),model:document.getElementById('aiModel').value.trim(),key:document.getElementById('aiKey').value.trim(),use:document.getElementById('aiUse').classList.contains('on')};aiSaveCfg(cfg);document.getElementById('aiModal').classList.remove('open');toast('Configuración de IA guardada en tu navegador');if(cfg.use&&cfg.key)generarPanorama();};
 document.getElementById('aiTest').onclick=async()=>{const cfg={provider:document.getElementById('aiProvider').value,base:document.getElementById('aiBase').value.trim(),model:document.getElementById('aiModel').value.trim(),key:document.getElementById('aiKey').value.trim(),use:true};aiSaveCfg(cfg);toast('Probando conexión…');try{const o=await aiChat([{role:'user',content:'Responde solo: OK'}]);toast('✅ IA respondió: '+(o||'').slice(0,40));}catch(e){toast('❌ '+e.message);}};
-document.getElementById('panoBtn').onclick=generarPanorama;
+document.getElementById('panoBtn').onclick=generatePanoramaLocal;
+document.getElementById('panoAiBtn').onclick=generarPanorama;
+document.getElementById('onlyMine').onclick=function(){this.classList.toggle('on');STATE.onlyMine=this.classList.contains('on');renderFeed();toast(STATE.onlyMine?'Mostrando solo '+INSTRUMENTS[SELECTED].label:'Mostrando todas');};
 
 /* ===========================================================
    AVISOS
@@ -638,11 +759,11 @@ setInterval(tick,1000);tick();
 /* ===========================================================
    ARRANQUE
    =========================================================== */
-buildInstr();loadTicker();loadAll();loadAgenda();
+buildInstr();loadTicker();renderSessions();loadAll();loadAgenda();
 setInterval(loadAll,REFRESH_MS);
 setInterval(loadAgenda,10*60*1000);
-setInterval(()=>{renderFeed();buildForecast();},60*1000); // refresca "hace X min" y agregados
-if(aiCfg().use&&aiCfg().key){setTimeout(generarPanorama,3000);}
+setInterval(()=>{renderFeed();buildForecast();renderRiskMeter();renderSessions();},60*1000);
+setInterval(renderSessions,30*1000);
 </script>
 </body>
 </html>
