@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>TraderDesk PRO · Analizador Predictivo de Noticias</title>
 <meta name="description" content="Terminal institucional que analiza noticias en cualquier idioma (traducidas al español) y proyecta el sesgo de US30, US100, XAUUSD y EUR/USD para las próximas horas y swing." />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
     --bg:#060912;--bg-2:#0b1120;--panel:#0f1828;--panel-2:#15223a;--border:#1d2c47;
@@ -148,6 +150,25 @@
   .riskverdict{text-align:center;font-size:15px;font-weight:800;margin-top:12px}
   .risksub{text-align:center;font-size:11.5px;color:var(--txt-dim);margin-top:3px}
 
+  /* MONITOR GLOBAL */
+  .monwrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--panel)}
+  .monlayers{display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg-2)}
+  .laychip{cursor:pointer;font-size:12px;font-weight:600;padding:6px 11px;border-radius:999px;border:1px solid var(--border);background:var(--panel);color:var(--txt-dim);display:inline-flex;align-items:center;gap:6px;transition:.15s;opacity:.55}
+  .laychip .ld{width:9px;height:9px;border-radius:50%}
+  .laychip.on{opacity:1;color:var(--txt);border-color:var(--accent)}
+  .laychip:hover{color:var(--txt)}
+  #monitorMap{height:560px;width:100%;background:#0a1322}
+  .monnote{padding:11px 14px;font-size:12.5px;color:var(--txt);border-top:1px solid var(--border);background:var(--bg-2);line-height:1.5}
+  .monnote b{color:var(--warn)}
+  .monemoji{background:transparent;border:none}
+  .monemoji>div{font-size:18px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.8));text-align:center}
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel-2);color:var(--txt);border:1px solid var(--border)}
+  .leaflet-popup-content{font-size:12.5px;line-height:1.45}
+  .leaflet-popup-content a{color:var(--accent)}
+  .leaflet-container{font-family:inherit}
+  .mp b{color:var(--accent)}
+  .mrel{display:block;margin-top:5px;color:var(--warn);font-size:11.5px}
+
   /* TV */
   .tvbox{position:relative;background:#000;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
   .tvbox iframe{width:100%;height:520px;border:0;display:block}
@@ -234,6 +255,14 @@
       <div class="ph"><span><span class="ic">🌡️</span> Termómetro Risk-On / Risk-Off</span><span id="riskStamp" style="font-size:10.5px;color:var(--txt-dim)"></span></div>
       <div id="riskmeter" style="padding:20px 16px"></div>
     </div>
+  </div>
+
+  <!-- GLOBAL MONITOR -->
+  <div class="section-title"><b>🌐 Monitor Global</b> · geopolítica, energía y riesgo en el mapa<span class="ln"></span><span id="monStamp" style="font-size:11px;color:var(--txt-dim)"></span></div>
+  <div class="monwrap mb">
+    <div class="monlayers" id="monLayers"></div>
+    <div id="monitorMap"></div>
+    <div class="monnote" id="monNote">Cargando focos de conflicto, sismos y puntos clave del mapa global…</div>
   </div>
 
   <!-- MAIN COLS -->
@@ -714,6 +743,99 @@ function renderRiskMeter(){
 }
 
 /* ===========================================================
+   MONITOR GLOBAL (mapa Leaflet + datos gratis)
+   =========================================================== */
+const MON={map:null,layers:{},loaded:false};
+const STATIC_PTS={
+ waterways:{color:'#38bdf8',icon:'⚓',pts:[
+  {n:'Estrecho de Ormuz',ll:[26.57,56.25],r:'~20% del petróleo mundial. Tensión aquí → petróleo↑ → inflación → XAUUSD↑ e índices↓.'},
+  {n:'Canal de Suez',ll:[30.02,32.55],r:'Ruta clave Asia-Europa. Bloqueos → fletes y energía↑.'},
+  {n:'Bab el-Mandeb',ll:[12.6,43.4],r:'Acceso al Mar Rojo. Ataques → desvíos y petróleo↑.'},
+  {n:'Estrecho de Malaca',ll:[2.5,101.0],r:'Comercio Asia. Riesgo → presión en cadenas de suministro.'},
+  {n:'Canal de Panamá',ll:[9.08,-79.68],r:'Sequías/bloqueos → costes logísticos↑.'},
+  {n:'Estrecho de Bósforo',ll:[41.1,29.1],r:'Granos y crudo del Mar Negro.'},
+ ]},
+ nuclear:{color:'#facc15',icon:'☢️',pts:[
+  {n:'Natanz (Irán)',ll:[33.72,51.73],r:'Programa nuclear iraní. Escalada → risk-off → XAUUSD↑.'},
+  {n:'Fordow (Irán)',ll:[34.88,50.99],r:'Instalación sensible. Foco de tensión EEUU/Israel-Irán.'},
+  {n:'Yongbyon (Corea N.)',ll:[39.8,125.75],r:'Tensión en Asia → aversión al riesgo.'},
+  {n:'Zaporiyia (Ucrania)',ll:[47.51,34.59],r:'Mayor central de Europa, zona de guerra.'},
+ ]},
+ bases:{color:'#22d3ee',icon:'🪖',pts:[
+  {n:'Al Udeid (Catar)',ll:[25.12,51.32],r:'Mayor base de EEUU en Oriente Medio.'},
+  {n:'Diego García',ll:[-7.31,72.41],r:'Base estratégica del Índico.'},
+  {n:'Ramstein (Alemania)',ll:[49.44,7.6],r:'Hub militar de EEUU/OTAN en Europa.'},
+  {n:'Yokosuka (Japón)',ll:[35.29,139.67],r:'7ª Flota de EEUU, Pacífico.'},
+ ]},
+ finance:{color:'#16c784',icon:'🏦',pts:[
+  {n:'Reserva Federal (Washington)',ll:[38.89,-77.04],r:'Decisiones de la Fed → mueve TODO: US30, US100, XAUUSD, EUR/USD.'},
+  {n:'BCE (Fráncfort)',ll:[50.11,8.68],r:'Política del BCE → clave para EUR/USD.'},
+  {n:'Banco de Japón (Tokio)',ll:[35.68,139.77],r:'BoJ y el yen → flujos de riesgo global.'},
+  {n:'Banco de Inglaterra (Londres)',ll:[51.51,-0.09],r:'Centro financiero, sesión de máxima liquidez.'},
+  {n:'Banco Popular China (Pekín)',ll:[39.91,116.36],r:'Estímulos/yuan → demanda global y materias primas.'},
+ ]},
+};
+function initMonitor(){
+ const noteEl=document.getElementById('monNote');
+ if(typeof L==='undefined'){noteEl.textContent='⚠️ No se pudo cargar la librería del mapa (sin conexión a unpkg). El resto del panel funciona igual.';return;}
+ try{
+  const map=L.map('monitorMap',{worldCopyJump:true,minZoom:2,maxZoom:8,scrollWheelZoom:true,attributionControl:true}).setView([28,25],2.4);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19,attribution:'© OpenStreetMap, © CARTO'}).addTo(map);
+  MON.map=map;
+  const defs=[
+   {id:'conflicts',name:'Conflictos',color:'#ef4444',on:true},
+   {id:'geopolitics',name:'Sanciones / Tensión',color:'#f59e0b',on:true},
+   {id:'disasters',name:'Sismos / Desastres',color:'#a855f7',on:true},
+   {id:'waterways',name:'Vías marítimas (petróleo)',color:'#38bdf8',on:true},
+   {id:'finance',name:'Bancos centrales',color:'#16c784',on:true},
+   {id:'nuclear',name:'Nuclear',color:'#facc15',on:false},
+   {id:'bases',name:'Bases militares',color:'#22d3ee',on:false},
+  ];
+  defs.forEach(d=>{MON.layers[d.id]=L.layerGroup();if(d.on)MON.layers[d.id].addTo(map);});
+  const lc=document.getElementById('monLayers');
+  lc.innerHTML=defs.map(d=>`<div class="laychip ${d.on?'on':''}" data-id="${d.id}"><span class="ld" style="background:${d.color}"></span>${d.name}</div>`).join('');
+  lc.querySelectorAll('.laychip').forEach(ch=>ch.onclick=()=>{const lg=MON.layers[ch.dataset.id];if(map.hasLayer(lg)){map.removeLayer(lg);ch.classList.remove('on');}else{lg.addTo(map);ch.classList.add('on');}});
+  renderStaticPts();
+  loadMonitorData();
+  setTimeout(()=>map.invalidateSize(),400);
+  MON.loaded=true;
+ }catch(e){noteEl.textContent='⚠️ Error iniciando el mapa: '+e.message;}
+}
+function emojiIcon(e){return L.divIcon({className:'monemoji',html:'<div>'+e+'</div>',iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-10]});}
+function renderStaticPts(){
+ Object.entries(STATIC_PTS).forEach(([id,cfg])=>{const g=MON.layers[id];if(!g)return;
+  cfg.pts.forEach(p=>{L.marker(p.ll,{icon:emojiIcon(cfg.icon)}).bindPopup(`<div class="mp"><b>${cfg.icon} ${p.n}</b><span class="mrel">📊 ${p.r}</span></div>`,{maxWidth:260}).addTo(g);});
+ });
+}
+async function gdelt(q){const url='https://api.gdeltproject.org/api/v2/geo/geo?query='+encodeURIComponent(q)+'&format=GeoJSON&timespan=3d';const t=await fetchText(url);if(!t)return null;try{return JSON.parse(t);}catch(e){return null;}}
+function addGeo(gj,group,color){if(!gj||!gj.features)return 0;let n=0;gj.features.forEach(f=>{const c=f.geometry&&f.geometry.coordinates;if(!c)return;const cnt=f.properties.count||1;const r=Math.min(20,5+Math.log(cnt+1)*3);
+  L.circleMarker([c[1],c[0]],{radius:r,color,weight:1,fillColor:color,fillOpacity:.4}).bindPopup('<div class="mp"><b>'+esc(f.properties.name||'Zona')+'</b><br>'+(cnt>1?cnt+' menciones (3 días)':'')+'<br>'+(f.properties.html||'')+'</div>',{maxWidth:300}).addTo(group);n++;});return n;}
+async function loadMonitorData(){
+ if(!MON.map)return;
+ ['conflicts','geopolitics','disasters'].forEach(id=>MON.layers[id]&&MON.layers[id].clearLayers());
+ let conf=0,geo=0,quakes=0,hormuz=false;
+ const [gc,gg]=await Promise.all([
+  gdelt('(war OR airstrike OR missile OR shelling OR clashes OR offensive OR invasion OR militants)'),
+  gdelt('(sanctions OR embargo OR "trade war" OR tariffs OR "military tensions" OR blockade)')
+ ]);
+ conf=addGeo(gc,MON.layers.conflicts,'#ef4444');
+ geo=addGeo(gg,MON.layers.geopolitics,'#f59e0b');
+ // proximidad a Ormuz
+ if(gc&&gc.features){hormuz=gc.features.some(f=>{const c=f.geometry&&f.geometry.coordinates;return c&&Math.abs(c[1]-26.57)<7&&Math.abs(c[0]-56.25)<9;});}
+ // sismos USGS
+ const tq=await fetchText('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson');
+ if(tq){try{const gj=JSON.parse(tq);gj.features.forEach(f=>{const c=f.geometry.coordinates;const m=f.properties.mag;const col=m>=6?'#ef4444':m>=5?'#f59e0b':'#a855f7';
+   L.circleMarker([c[1],c[0]],{radius:Math.max(4,m*2),color:col,weight:1,fillColor:col,fillOpacity:.35}).bindPopup('<div class="mp"><b>Sismo M'+m+'</b><br>'+esc(f.properties.place||'')+'<br><a href="'+f.properties.url+'" target="_blank" rel="noopener">USGS →</a></div>').addTo(MON.layers.disasters);quakes++;});}catch(e){}}
+ const note=document.getElementById('monNote');
+ let txt=`🔴 <b>${conf}</b> focos de conflicto · 🟠 <b>${geo}</b> de tensión/sanciones · 🟣 <b>${quakes}</b> sismos M4.5+ (últimos días). `;
+ if(hormuz)txt+=`<br><b>⚠️ Actividad cerca del Estrecho de Ormuz</b> → riesgo de petróleo↑ e inflación: favorece XAUUSD (refugio) y presiona US30/US100. Sesgo risk-off.`;
+ else if(conf>8)txt+=`<br><b>⚠️ Alta conflictividad global</b> → contexto risk-off: vigila XAUUSD al alza y posible presión en índices.`;
+ else txt+=`<br>Sin focos críticos cerca de rutas petroleras ahora mismo. Contexto geopolítico contenido.`;
+ note.innerHTML=txt;
+ document.getElementById('monStamp').textContent='Actualizado '+new Date().toLocaleTimeString('es-ES');
+}
+
+/* ===========================================================
    TRADINGVIEW HELPER
    =========================================================== */
 function tvInto(el,src,cfg){el.innerHTML='';const w=document.createElement('div');w.className='tradingview-widget-container';const i=document.createElement('div');i.className='tradingview-widget-container__widget';w.appendChild(i);const s=document.createElement('script');s.async=true;s.src=src;s.innerHTML=JSON.stringify(cfg);w.appendChild(s);el.appendChild(w);}
@@ -759,9 +881,10 @@ setInterval(tick,1000);tick();
 /* ===========================================================
    ARRANQUE
    =========================================================== */
-buildInstr();loadTicker();renderSessions();loadAll();loadAgenda();
+buildInstr();loadTicker();renderSessions();initMonitor();loadAll();loadAgenda();
 setInterval(loadAll,REFRESH_MS);
 setInterval(loadAgenda,10*60*1000);
+setInterval(loadMonitorData,15*60*1000);
 setInterval(()=>{renderFeed();buildForecast();renderRiskMeter();renderSessions();},60*1000);
 setInterval(renderSessions,30*1000);
 </script>
